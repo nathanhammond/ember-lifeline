@@ -10,7 +10,7 @@ import { IMap } from './interfaces';
  * @private
  *
  */
-const eventListeners: IMap<Object, Array<Function>> = new WeakMap();
+const eventListeners: IMap<Object, Array<Object>> = new WeakMap();
 
 const PASSIVE_SUPPORTED = (() => {
   let ret = false;
@@ -70,23 +70,29 @@ const INDEX = {
      init() {
        this._super(...arguments);
        const el = document.querySelector('.foo');
-       addEventListener(this, el, 'click')
+       addEventListener(this, el, 'click');
      }
    });
    ```
 
    @method addEventListener
    @param { Object } obj the instance to attach the listener for
-   @param { String } selector the DOM selector or element
+   @param { HTMLElement } element the DOM element
    @param { String } eventName the event name to listen for
    @param { Function } callback the callback to run for that event
    @public
    */
-export function addEventListener(obj, element, eventName, callback, options) {
+export function addEventListener<Target>(
+  obj: Target,
+  element: HTMLElement,
+  eventName: string,
+  callback: RunMethod<Target>,
+  options: any
+): void {
   assertArguments(element, eventName, callback);
 
-  let _callback = bind(obj, callback);
-  let listeners = getEventListeners(obj);
+  let _callback: EventListenerOrEventListenerObject = bind(obj, callback);
+  let listeners: Array<Object> = getEventListeners(obj);
 
   if (!PASSIVE_SUPPORTED) {
     options = undefined;
@@ -98,21 +104,21 @@ export function addEventListener(obj, element, eventName, callback, options) {
 
 /**
    @param { Object } obj the instance to remove the listener for
-   @param { String } selector the DOM selector or element
+   @param { HTMLElement } element the DOM element
    @param { String } eventName the event name to listen for
    @param { Function } callback the callback to run for that event
    @public
    */
-export function removeEventListener(
-  obj,
-  element,
-  eventName,
-  callback,
-  options
-) {
+export function removeEventListener<Target>(
+  obj: Target,
+  element: HTMLElement,
+  eventName: string,
+  callback: RunMethod<Target>,
+  options: any
+): void {
   assertArguments(element, eventName, callback);
 
-  let listeners = getEventListeners(obj);
+  let listeners: Array<Object> = getEventListeners(obj);
 
   if (listeners.length === 0) {
     return;
@@ -132,7 +138,9 @@ export function removeEventListener(
       /*
          * Drop the event listener and remove the listener object
          */
-      let ownCallback = listeners[i + INDEX.CALLBACK];
+      let ownCallback: EventListenerOrEventListenerObject = <
+        EventListenerOrEventListenerObject
+      >listeners[i + INDEX.CALLBACK];
       element.removeEventListener(eventName, ownCallback, options);
       listeners.splice(i, LISTENER_ITEM_LENGTH);
       break;
@@ -140,7 +148,11 @@ export function removeEventListener(
   }
 }
 
-function assertArguments(element, eventName, callback) {
+function assertArguments(
+  element: HTMLElement,
+  eventName: string,
+  callback: any
+): void {
   assert('Must provide a DOM element', !!element);
   assert(
     'Must provide an element (not a DOM selector)',
@@ -156,15 +168,17 @@ function assertArguments(element, eventName, callback) {
   assert('Must provide a callback to run for the given event name', !!callback);
 }
 
-function getEventListenersDisposable(listeners) {
+function getEventListenersDisposable(listeners: Array<Object>): Function {
   return function() {
     if (listeners !== undefined) {
       /* Drop non-passive event listeners */
       for (let i = 0; i < listeners.length; i += LISTENER_ITEM_LENGTH) {
-        let element = listeners[i + INDEX.ELEMENT];
-        let eventName = listeners[i + INDEX.EVENT_NAME];
-        let callback = listeners[i + INDEX.CALLBACK];
-        let options = listeners[i + INDEX.OPTIONS];
+        let element: HTMLElement = <HTMLElement>listeners[i + INDEX.ELEMENT];
+        let eventName: string = <string>listeners[i + INDEX.EVENT_NAME];
+        let callback: EventListenerOrEventListenerObject = <
+          EventListenerOrEventListenerObject
+        >listeners[i + INDEX.CALLBACK];
+        let options: Object = listeners[i + INDEX.OPTIONS];
 
         element.removeEventListener(eventName, callback, options);
       }
@@ -173,11 +187,11 @@ function getEventListenersDisposable(listeners) {
   };
 }
 
-function getEventListeners(obj) {
+function getEventListeners(obj): Array<Object> {
   let listeners = eventListeners.get(obj);
 
   if (!listeners) {
-    listeners = Array<Function>();
+    listeners = Array<Object>();
     eventListeners.set(obj, listeners);
     registerDisposable(obj, getEventListenersDisposable(listeners));
   }
